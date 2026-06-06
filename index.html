@@ -337,19 +337,18 @@ function canMoveTo(x, y, w, h) {
   for (const f of furniture) {
     if (rectCollide(ent, {x:f.x, y:f.y, w:f.w, h:f.h})) return false;
   }
-  // Room bounds
+  // Check if center point is inside any room (forgiving check)
+  const cx = x + w/2, cy = y + h/2;
   let inRoom = false;
   for (const r of rooms) {
-    const margin = 4;
-    if (x >= r.x+margin && x+w <= r.x+r.w-margin &&
-        y >= r.y+margin && y+h <= r.y+r.h-margin) {
+    if (cx > r.x && cx < r.x + r.w && cy > r.y && cy < r.y + r.h) {
       inRoom = true; break;
     }
   }
-  // Allow hallway area connections too (door zones)
+  // Door zones (allow movement through doorways)
   for (const d of doors) {
     const mx = (d.x1+d.x2)/2, my = (d.y1+d.y2)/2;
-    if (Math.abs(x+w/2 - mx) < 30 && Math.abs(y+h/2 - my) < 30) inRoom = true;
+    if (Math.abs(cx - mx) < 30 && Math.abs(cy - my) < 30) inRoom = true;
   }
   return inRoom;
 }
