@@ -1,0 +1,1016 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Neighbour from Hell</title>
+<style>
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{background:#1a1a2e;display:flex;justify-content:center;align-items:center;min-height:100vh;font-family:'Segoe UI',system-ui,sans-serif;overflow:hidden}
+  .game-wrapper{background:#16213e;padding:20px;border-radius:20px;box-shadow:0 20px 60px rgba(0,0,0,.8);position:relative}
+  .header{display:flex;justify-content:space-between;align-items:center;padding:0 10px 12px 10px;color:#e0e0e0;font-size:14px;font-weight:600}
+  .header .title{font-size:20px;color:#ff6b35;text-shadow:0 0 20px rgba(255,107,53,.3);letter-spacing:1px}
+  .header .title span{color:#ffd93d}
+  .stats{display:flex;gap:20px}
+  .stat{display:flex;align-items:center;gap:6px;background:rgba(255,255,255,.08);padding:4px 14px;border-radius:10px;height:32px}
+  .stat .icon{font-size:16px}
+  .stat .val{font-family:'Courier New',monospace;font-size:16px;min-width:24px;text-align:center}
+  .stat .val.gold{color:#ffd93d}
+  .stat .val.green{color:#6bcb6b}
+  .stat .val.red{color:#ff6b6b}
+  canvas{display:block;border-radius:12px;background:#2d2d44;box-shadow:inset 0 0 40px rgba(0,0,0,.4);cursor:none;width:800px;height:600px}
+  .controls-info{display:flex;justify-content:center;gap:28px;padding-top:12px;color:#8888aa;font-size:12px}
+  .controls-info kbd{background:rgba(255,255,255,.1);padding:2px 8px;border-radius:4px;font-family:inherit;color:#ccc;border:1px solid rgba(255,255,255,.15)}
+  .overlay{position:absolute;inset:20px;border-radius:12px;display:flex;flex-direction:column;align-items:center;justify-content:center;background:rgba(0,0,0,.75);backdrop-filter:blur(6px);z-index:10;transition:opacity .3s;pointer-events:none;opacity:0}
+  .overlay.show{opacity:1;pointer-events:auto}
+  .overlay h1{font-size:48px;margin-bottom:8px}
+  .overlay h2{font-size:28px;color:#e0e0e0;margin-bottom:6px}
+  .overlay p{color:#aaa;font-size:16px;margin-bottom:20px;max-width:400px;text-align:center;line-height:1.5}
+  .overlay .big-btn{background:#ff6b35;border:none;color:#fff;font-size:20px;font-weight:700;padding:14px 48px;border-radius:12px;cursor:pointer;transition:all .2s;box-shadow:0 4px 20px rgba(255,107,53,.4)}
+  .overlay .big-btn:hover{transform:scale(1.05);background:#ff8a5c}
+  .overlay .big-btn:active{transform:scale(.97)}
+  .sub{color:#7777aa;font-size:13px;margin-top:12px}
+  .sub span{color:#ffd93d}
+  #startScreen h1{color:#ff6b35;text-shadow:0 0 30px rgba(255,107,53,.3)}
+  #startScreen h1 span{color:#ffd93d}
+  #gameOverScreen h1{color:#ff6b6b}
+  #winScreen h1{color:#6bcb6b}
+  .prank-list{display:flex;gap:8px;margin-bottom:16px}
+  .prank-item{background:rgba(255,255,255,.08);padding:4px 12px;border-radius:8px;font-size:13px;color:#ccc;border:1px solid rgba(255,255,255,.1)}
+  .prank-item.done{background:rgba(107,203,107,.15);border-color:#6bcb6b;color:#6bcb6b;text-decoration:line-through}
+</style>
+</head>
+<body>
+
+<div class="game-wrapper">
+  <div class="header">
+    <div class="title">🏠 NEIGHBOUR <span>FROM HELL</span></div>
+    <div class="stats">
+      <div class="stat"><span class="icon">🎯</span><span class="val gold" id="scoreDisplay">0</span><span style="color:#777">/ 7</span></div>
+      <div class="stat"><span class="icon">❤️</span><span class="val green" id="livesDisplay">❤️❤️❤️</span></div>
+      <div class="stat"><span class="icon">⏱️</span><span class="val red" id="timerDisplay">3:00</span></div>
+      <div class="stat"><span class="icon">📦</span><span class="val" id="itemDisplay" style="color:#ffd93d">—</span></div>
+    </div>
+  </div>
+
+  <div style="position:relative">
+    <canvas id="gameCanvas" width="800" height="600"></canvas>
+
+    <div class="overlay show" id="startScreen">
+      <h1>🏠 NEIGHBOUR <span>FROM HELL</span></h1>
+      <h2>🤬</h2>
+      <p>Sneak into your grumpy neighbour's house and set up <strong>7 pranks</strong> before he catches you! Walk over items to pick them up, then place them as traps.</p>
+      <button class="big-btn" onclick="startGame()">▶ PLAY</button>
+      <div class="sub">WASD move · E pick up · Q place trap · <span>Don't get caught!</span></div>
+    </div>
+
+    <div class="overlay" id="gameOverScreen">
+      <h1>💀 BUSTED!</h1>
+      <h2>The neighbour caught you!</h2>
+      <p id="gameOverMsg">You pulled off <span id="finalScore">0</span> / 7 pranks.</p>
+      <button class="big-btn" onclick="startGame()">🔄 TRY AGAIN</button>
+    </div>
+
+    <div class="overlay" id="winScreen">
+      <h1>🎉 YOU WIN!</h1>
+      <h2>Total chaos achieved!</h2>
+      <p>You pulled off every prank and drove the neighbour crazy!<br><span style="color:#ffd93d;font-size:24px">🏆 MASTER PRANKSTER</span></p>
+      <button class="big-btn" onclick="startGame()">🔄 PLAY AGAIN</button>
+    </div>
+  </div>
+
+  <div class="controls-info">
+    <span><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> Move</span>
+    <span><kbd>E</kbd> Pick up item</span>
+    <span><kbd>Q</kbd> Place trap</span>
+    <span>🤫 Stay out of sight!</span>
+  </div>
+</div>
+
+<script>
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+const W = 800, H = 600;
+
+// DOM refs
+const scoreDisplay = document.getElementById('scoreDisplay');
+const livesDisplay = document.getElementById('livesDisplay');
+const timerDisplay = document.getElementById('timerDisplay');
+const itemDisplay = document.getElementById('itemDisplay');
+const startScreen = document.getElementById('startScreen');
+const gameOverScreen = document.getElementById('gameOverScreen');
+const winScreen = document.getElementById('winScreen');
+const finalScore = document.getElementById('finalScore');
+const gameOverMsg = document.getElementById('gameOverMsg');
+
+// ─── HOUSE LAYOUT ───
+const rooms = [
+  { id:'living',  x:10, y:10, w:300, h:280, name:'Living Room', color:'#3d3d5c' },
+  { id:'kitchen', x:320, y:10, w:250, h:280, name:'Kitchen', color:'#3d5040' },
+  { id:'hallway', x:580, y:10, w:210, h:280, name:'Hallway', color:'#4a3d5c' },
+  { id:'bedroom', x:10, y:300, w:370, h:290, name:'Bedroom', color:'#5c3d4a' },
+  { id:'garage',  x:390, y:300, w:400, h:290, name:'Garage', color:'#3d3d3d' },
+];
+
+// Furniture (collision + hiding spots)
+const furniture = [
+  // Living room
+  { x:40, y:50, w:80, h:50, type:'sofa', color:'#6b4c3b' },
+  { x:160, y:40, w:60, h:60, type:'table', color:'#5c4a3a' },
+  { x:70, y:180, w:100, h:40, type:'tv_stand', color:'#444' },
+  // Kitchen
+  { x:340, y:40, w:80, h:70, type:'fridge', color:'#556b7a' },
+  { x:440, y:30, w:50, h:80, type:'cabinet', color:'#6b5a4a' },
+  { x:350, y:190, w:90, h:50, type:'counter', color:'#5a6b4a' },
+  // Hallway
+  { x:610, y:40, w:50, h:50, type:'table', color:'#5c4a3a' },
+  { x:690, y:140, w:70, h:40, type:'shelf', color:'#4a3d30' },
+  // Bedroom
+  { x:40, y:330, w:100, h:70, type:'bed', color:'#6b5a6b' },
+  { x:190, y:320, w:60, h:60, type:'desk', color:'#5c4a3a' },
+  { x:50, y:470, w:80, h:40, type:'wardrobe', color:'#6b4a4a' },
+  // Garage
+  { x:420, y:330, w:90, h:60, type:'workbench', color:'#555' },
+  { x:550, y:340, w:60, h:50, type:'shelf', color:'#4a3d30' },
+  { x:650, y:430, w:80, h:50, type:'box', color:'#6b5a3a' },
+  { x:420, y:470, w:120, h:40, type:'toolrack', color:'#444' },
+];
+
+// Doors (gaps in walls)
+const doors = [
+  { x1:310, y1:140, x2:320, y2:160 }, // living → kitchen
+  { x1:570, y1:140, x2:580, y2:160 }, // kitchen → hallway
+  { x1:310, y1:420, x2:320, y2:440 }, // living → bedroom  (adjusted)
+  { x1:380, y1:140, x2:390, y2:160 }, // kitchen → hallway lower
+  { x1:380, y1:420, x2:390, y2:440 }, // bedroom → garage
+  { x1:570, y1:420, x2:580, y2:440 }, // hallway → garage
+];
+// We'll handle door openings as special wall gaps
+
+// ─── WALLS (collision segments) ───
+function buildWalls() {
+  const walls = [];
+  const T = 10; // wall thickness
+  rooms.forEach(r => {
+    // Outer walls with door gaps
+    const doorGaps = doors.filter(d => {
+      const onTop = Math.abs(d.y1 - r.y) < T && d.x1 >= r.x && d.x2 <= r.x+r.w;
+      const onBottom = Math.abs(d.y1 - (r.y+r.h)) < T && d.x1 >= r.x && d.x2 <= r.x+r.w;
+      const onLeft = Math.abs(d.x1 - r.x) < T && d.y1 >= r.y && d.y2 <= r.y+r.h;
+      const onRight = Math.abs(d.x1 - (r.x+r.w)) < T && d.y1 >= r.y && d.y2 <= r.y+r.h;
+      return onTop || onBottom || onLeft || onRight;
+    });
+
+    function hasDoor(x1,y1,x2,y2) {
+      const mx = (x1+x2)/2, my = (y1+y2)/2;
+      return doorGaps.some(d => {
+        const dx = (d.x1+d.x2)/2, dy = (d.y1+d.y2)/2;
+        return Math.abs(mx-dx) < 30 && Math.abs(my-dy) < 30;
+      });
+    }
+
+    const segments = [
+      [r.x, r.y, r.x+r.w, r.y],
+      [r.x+r.w, r.y, r.x+r.w, r.y+r.h],
+      [r.x, r.y+r.h, r.x+r.w, r.y+r.h],
+      [r.x, r.y, r.x, r.y+r.h],
+    ];
+
+    segments.forEach(([x1,y1,x2,y2]) => {
+      if (hasDoor(x1,y1,x2,y2)) {
+        // Split wall into two pieces around door
+        const doorGap = doorGaps.find(d => {
+          const dx = (d.x1+d.x2)/2, dy = (d.y1+d.y2)/2;
+          const mx = (x1+x2)/2, my = (y1+y2)/2;
+          return Math.abs(mx-dx) < 30 && Math.abs(my-dy) < 30;
+        });
+        if (doorGap) {
+          const dgx = (doorGap.x1+doorGap.x2)/2;
+          const dgy = (doorGap.y1+doorGap.y2)/2;
+          if (Math.abs(y1-y2) < 5) {
+            // horizontal wall
+            if (x1 < dgx) walls.push({x:x1, y:y1, w:dgx-x1-15, h:T});
+            if (x2 > dgx) walls.push({x:dgx+15, y:y1, w:x2-dgx-15, h:T});
+          } else {
+            // vertical wall
+            if (y1 < dgy) walls.push({x:x1, y:y1, w:T, h:dgy-y1-15});
+            if (y2 > dgy) walls.push({x:x1, y:dgy+15, w:T, h:y2-dgy-15});
+          }
+        }
+      } else {
+        if (Math.abs(y1-y2) < 5) walls.push({x:x1, y:y1, w:x2-x1, h:T});
+        else walls.push({x:x1, y:y1, w:T, h:y2-y1});
+      }
+    });
+  });
+  return walls;
+}
+
+let walls = buildWalls();
+
+// ─── GAME STATE ───
+let game = {
+  score: 0,
+  lives: 3,
+  timeLeft: 180,
+  pranks: 0,
+  pranksTarget: 7,
+  heldItem: null,
+  running: false,
+  gameOver: false,
+  won: false,
+  particles: [],
+  shakeTimer: 0,
+  neighborCaution: 0,
+};
+
+// ─── PRANK ITEMS ───
+const itemTypes = [
+  { id:'banana',     name:'🍌 Banana Peel',   emoji:'🍌' },
+  { id:'water',      name:'💧 Water Bucket',  emoji:'💧' },
+  { id:'tripwire',   name:'🪢 Tripwire',      emoji:'🪢' },
+  { id:'whoopee',    name:'💨 Whoopee Cushion',emoji:'💨' },
+  { id:'paint',      name:'🎨 Paint Bucket',  emoji:'🎨' },
+  { id:'slipper',    name:'🩴 Banana Slipper', emoji:'🩴' },
+  { id:'spring',     name:'🌀 Spring Trap',   emoji:'🌀' },
+];
+
+const prankNames = [
+  'Banana Peel', 'Water Bucket', 'Tripwire', 'Whoopee Cushion',
+  'Paint Bucket', 'Slipper Trap', 'Spring Trap'
+];
+
+// Items on the floor
+let floorItems = [];
+
+function spawnItems() {
+  floorItems = [];
+  const spawnPositions = [
+    {x:100,y:100},{x:220,y:80},{x:370,y:70},{x:470,y:100},
+    {x:640,y:70},{x:690,y:60},{x:120,y:360},{x:240,y:380},
+    {x:80,y:500},{x:460,y:370},{x:580,y:400},{x:680,y:480},
+    {x:440,y:500},{x:700,y:350}
+  ];
+  for (let i = 0; i < Math.min(14, itemTypes.length*2); i++) {
+    const type = itemTypes[i % itemTypes.length];
+    // Only spawn items we haven't completed yet
+    const idx = itemTypes.findIndex(it => it.id === type.id);
+    floorItems.push({
+      x: spawnPositions[i].x,
+      y: spawnPositions[i].y,
+      w: 24, h: 24,
+      type: type,
+      collected: false,
+      idx: i
+    });
+  }
+}
+
+// ─── PLAYER ───
+let player = { x:400, y:500, w:16, h:16, speed:2.8, vx:0, vy:0, facing:0 };
+
+// ─── NEIGHBOUR AI ───
+let neighbour = {
+  x: 600, y: 50, w: 18, h: 18,
+  speed: 1.3,
+  state: 'patrol', // patrol, suspicious, chasing
+  targetX: 600, targetY: 50,
+  patrolPoints: [
+    {x:150,y:150},{x:400,y:50},{x:650,y:80},
+    {x:650,y:200},{x:400,y:220},{x:150,y:220},
+    {x:80,y:400},{x:250,y:420},{x:150,y:550},
+    {x:450,y:400},{x:600,y:500},{x:700,y:400},
+  ],
+  patrolIdx: 0,
+  visionRange: 200,
+  visionAngle: Math.PI * 1.2,
+  dir: 1,
+  timer: 0,
+  suspicion: 0,
+  caughtCooldown: 0,
+};
+
+function resetGame() {
+  game.score = 0;
+  game.lives = 3;
+  game.timeLeft = 180;
+  game.pranks = 0;
+  game.heldItem = null;
+  game.running = false;
+  game.gameOver = false;
+  game.won = false;
+  game.particles = [];
+  game.shakeTimer = 0;
+  game.neighborCaution = 0;
+
+  player.x = 400; player.y = 500;
+  player.vx = 0; player.vy = 0;
+
+  neighbour.x = 600; neighbour.y = 50;
+  neighbour.state = 'patrol';
+  neighbour.patrolIdx = 0;
+  neighbour.suspicion = 0;
+  neighbour.caughtCooldown = 0;
+  neighbour.targetX = neighbour.patrolPoints[0].x;
+  neighbour.targetY = neighbour.patrolPoints[0].y;
+
+  spawnItems();
+  updateUI();
+}
+
+// ─── TRAPS (placed by player) ───
+let traps = [];
+
+// ─── COLLISION ───
+function rectCollide(a, b) {
+  return a.x < b.x + b.w && a.x + a.w > b.x &&
+         a.y < b.y + b.h && a.y + a.h > b.y;
+}
+
+function canMoveTo(x, y, w, h) {
+  const ent = {x, y, w, h};
+  // Wall collision
+  for (const wl of walls) {
+    if (rectCollide(ent, wl)) return false;
+  }
+  // Furniture collision (solid)
+  for (const f of furniture) {
+    if (rectCollide(ent, {x:f.x, y:f.y, w:f.w, h:f.h})) return false;
+  }
+  // Room bounds
+  let inRoom = false;
+  for (const r of rooms) {
+    const margin = 4;
+    if (x >= r.x+margin && x+w <= r.x+r.w-margin &&
+        y >= r.y+margin && y+h <= r.y+r.h-margin) {
+      inRoom = true; break;
+    }
+  }
+  // Allow hallway area connections too (door zones)
+  for (const d of doors) {
+    const mx = (d.x1+d.x2)/2, my = (d.y1+d.y2)/2;
+    if (Math.abs(x+w/2 - mx) < 30 && Math.abs(y+h/2 - my) < 30) inRoom = true;
+  }
+  return inRoom;
+}
+
+// ─── NEIGHBOUR AI ───
+function updateNeighbour() {
+  if (game.gameOver || game.won || !game.running) return;
+  if (neighbour.caughtCooldown > 0) { neighbour.caughtCooldown--; return; }
+
+  const dx = neighbour.targetX - neighbour.x;
+  const dy = neighbour.targetY - neighbour.y;
+  const dist = Math.sqrt(dx*dx + dy*dy);
+
+  // Player detection
+  const pdx = player.x - neighbour.x;
+  const pdy = player.y - neighbour.y;
+  const pDist = Math.sqrt(pdx*pdx + pdy*pdy);
+
+  // Check line of sight to player
+  let canSee = false;
+  if (pDist < neighbour.visionRange) {
+    // Simple raycast check
+    canSee = true;
+    const steps = 20;
+    for (let i = 1; i < steps; i++) {
+      const t = i / steps;
+      const cx = neighbour.x + pdx * t;
+      const cy = neighbour.y + pdy * t;
+      for (const wl of walls) {
+        if (cx > wl.x && cx < wl.x+wl.w && cy > wl.y && cy < wl.y+wl.h) {
+          canSee = false; break;
+        }
+      }
+      if (!canSee) break;
+      for (const f of furniture) {
+        if (cx > f.x && cx < f.x+f.w && cy > f.y && cy < f.y+f.h) {
+          canSee = false; break;
+        }
+      }
+      if (!canSee) break;
+    }
+  }
+
+  if (canSee) {
+    neighbour.suspicion = Math.min(100, neighbour.suspicion + 2);
+    if (neighbour.suspicion >= 60) {
+      neighbour.state = 'chasing';
+      neighbour.targetX = player.x;
+      neighbour.targetY = player.y;
+      neighbour.speed = 2.2;
+    } else if (neighbour.suspicion >= 30) {
+      neighbour.state = 'suspicious';
+      neighbour.targetX = Math.round(player.x / 50) * 50;
+      neighbour.targetY = Math.round(player.y / 50) * 50;
+      neighbour.speed = 1.5;
+    }
+  } else {
+    neighbour.suspicion = Math.max(0, neighbour.suspicion - 0.5);
+    if (neighbour.suspicion < 30 && neighbour.state !== 'patrol') {
+      neighbour.state = 'patrol';
+      neighbour.speed = 1.2;
+      neighbour.targetX = neighbour.patrolPoints[neighbour.patrolIdx].x;
+      neighbour.targetY = neighbour.patrolPoints[neighbour.patrolIdx].y;
+    }
+  }
+
+  // Chase - actually move toward player
+  if (neighbour.state === 'chasing') {
+    neighbour.targetX = player.x;
+    neighbour.targetY = player.y;
+  }
+
+  // Move toward target
+  const tdx = neighbour.targetX - neighbour.x;
+  const tdy = neighbour.targetY - neighbour.y;
+  const tDist = Math.sqrt(tdx*tdx + tdy*tdy);
+
+  if (tDist > 5) {
+    const step = Math.min(neighbour.speed, tDist);
+    const nx = neighbour.x + (tdx/tDist) * step;
+    const ny = neighbour.y + (tdy/tDist) * step;
+
+    if (canMoveTo(nx - neighbour.w/2, neighbour.y - neighbour.h/2, neighbour.w, neighbour.h)) {
+      neighbour.x = nx;
+    }
+    if (canMoveTo(neighbour.x - neighbour.w/2, ny - neighbour.h/2, neighbour.w, neighbour.h)) {
+      neighbour.y = ny;
+    }
+    neighbour.dir = tdx > 0 ? 1 : -1;
+  } else if (neighbour.state === 'patrol') {
+    neighbour.patrolIdx = (neighbour.patrolIdx + 1) % neighbour.patrolPoints.length;
+    neighbour.targetX = neighbour.patrolPoints[neighbour.patrolIdx].x;
+    neighbour.targetY = neighbour.patrolPoints[neighbour.patrolIdx].y;
+  }
+
+  // Check if caught player
+  if (canSee && pDist < 28 && neighbour.caughtCooldown <= 0) {
+    caughtByNeighbour();
+  }
+
+  // Check trap collision
+  for (let i = traps.length - 1; i >= 0; i--) {
+    const trap = traps[i];
+    if (trap.triggered) continue;
+    const dx2 = neighbour.x - trap.x;
+    const dy2 = neighbour.y - trap.y;
+    if (Math.sqrt(dx2*dx2 + dy2*dy2) < 30) {
+      // Trap triggered!
+      trap.triggered = true;
+      game.score++;
+      game.pranks++;
+      game.shakeTimer = 15;
+      // Particles
+      for (let p = 0; p < 30; p++) {
+        game.particles.push({
+          x: trap.x, y: trap.y,
+          vx: (Math.random()-0.5)*6,
+          vy: (Math.random()-0.5)*6 - 2,
+          life: 40 + Math.random()*30,
+          maxLife: 70,
+          color: ['#ff6b35','#ffd93d','#6bcb6b','#ff6b6b','#fff'][Math.floor(Math.random()*5)],
+          size: 3+Math.random()*5
+        });
+      }
+      neighbour.suspicion = 100;
+      neighbour.caughtCooldown = 40;
+      playBeep(800, 0.1);
+      playBeep(1200, 0.15);
+      updateUI();
+      checkWin();
+    }
+  }
+}
+
+function caughtByNeighbour() {
+  game.lives--;
+  playBeep(200, 0.3);
+  playBeep(150, 0.3);
+  game.shakeTimer = 20;
+
+  // Particles - red burst
+  for (let p = 0; p < 25; p++) {
+    game.particles.push({
+      x: player.x, y: player.y,
+      vx: (Math.random()-0.5)*8,
+      vy: (Math.random()-0.5)*8,
+      life: 30, maxLife: 30,
+      color: '#ff3333',
+      size: 4+Math.random()*6
+    });
+  }
+
+  if (game.lives <= 0) {
+    game.gameOver = true;
+    game.running = false;
+    finalScore.textContent = game.score;
+    gameOverMsg.innerHTML = `You pulled off <strong>${game.score}</strong> / ${game.pranksTarget} pranks before getting caught.`;
+    gameOverScreen.classList.add('show');
+    return;
+  }
+
+  // Teleport player
+  player.x = 400; player.y = 500;
+  neighbour.suspicion = 0;
+  neighbour.state = 'patrol';
+  neighbour.caughtCooldown = 60;
+  neighbour.speed = 1.2;
+  neighbour.targetX = neighbour.patrolPoints[0].x;
+  neighbour.targetY = neighbour.patrolPoints[0].y;
+  updateUI();
+}
+
+function checkWin() {
+  if (game.score >= game.pranksTarget) {
+    game.won = true;
+    game.running = false;
+    winScreen.classList.add('show');
+    for (let p = 0; p < 60; p++) {
+      game.particles.push({
+        x: Math.random()*W, y: Math.random()*H,
+        vx: (Math.random()-0.5)*3,
+        vy: -1 - Math.random()*3,
+        life: 60+Math.random()*40,
+        maxLife: 100,
+        color: ['#ff6b35','#ffd93d','#6bcb6b','#ff6b6b','#fff','#6bcbff'][Math.floor(Math.random()*6)],
+        size: 3+Math.random()*6
+      });
+    }
+  }
+}
+
+// ─── PLAYER INPUT ───
+const keys = {};
+document.addEventListener('keydown', e => {
+  keys[e.key.toLowerCase()] = true;
+  if (e.key === 'e' || e.key === 'E') pickupItem();
+  if (e.key === 'q' || e.key === 'Q') placeTrap();
+});
+document.addEventListener('keyup', e => {
+  keys[e.key.toLowerCase()] = false;
+});
+
+function pickupItem() {
+  if (!game.running || game.gameOver || game.won) return;
+  if (game.heldItem) return; // already holding something
+
+  for (const item of floorItems) {
+    if (item.collected) continue;
+    const dx = player.x - item.x;
+    const dy = player.y - item.y;
+    if (Math.sqrt(dx*dx + dy*dy) < 30) {
+      game.heldItem = item.type;
+      item.collected = true;
+      playBeep(600, 0.08);
+      updateUI();
+      return;
+    }
+  }
+}
+
+function placeTrap() {
+  if (!game.running || game.gameOver || game.won) return;
+  if (!game.heldItem) return;
+
+  // Check if we can place here (not on walls/furniture)
+  const pw = 20, ph = 20;
+  if (!canMoveTo(player.x-pw/2, player.y-ph/2, pw, ph)) return;
+
+  // Don't place on another trap
+  for (const t of traps) {
+    if (!t.triggered) {
+      const dx = player.x - t.x;
+      const dy = player.y - t.y;
+      if (Math.sqrt(dx*dx + dy*dy) < 20) return;
+    }
+  }
+
+  traps.push({
+    x: player.x,
+    y: player.y,
+    type: game.heldItem,
+    triggered: false,
+    time: 0,
+  });
+
+  // Find prank name index
+  const idx = itemTypes.findIndex(it => it.id === game.heldItem.id);
+  game.heldItem = null;
+  playBeep(500, 0.1);
+  updateUI();
+}
+
+// ─── AUDIO ───
+let audioCtx = null;
+function getAudioCtx() {
+  if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  return audioCtx;
+}
+function playBeep(freq, dur) {
+  try {
+    const ctx = getAudioCtx();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.frequency.value = freq;
+    osc.type = 'square';
+    gain.gain.setValueAtTime(0.08, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + dur);
+    osc.start();
+    osc.stop(ctx.currentTime + dur);
+  } catch(e) {}
+}
+
+// ─── UI UPDATE ───
+function updateUI() {
+  scoreDisplay.textContent = game.score;
+  const hearts = '❤️'.repeat(game.lives) + '🖤'.repeat(Math.max(0, 3-game.lives));
+  livesDisplay.textContent = hearts || '💀';
+  const mins = Math.floor(game.timeLeft / 60);
+  const secs = Math.floor(game.timeLeft % 60);
+  timerDisplay.textContent = `${mins}:${secs.toString().padStart(2,'0')}`;
+  itemDisplay.textContent = game.heldItem ? game.heldItem.emoji : '—';
+}
+
+// ─── DRAWING ───
+function draw() {
+  ctx.save();
+
+  // Screen shake
+  if (game.shakeTimer > 0) {
+    const intensity = game.shakeTimer * 0.4;
+    ctx.translate(Math.random()*intensity - intensity/2, Math.random()*intensity - intensity/2);
+    game.shakeTimer--;
+  }
+
+  // Floor
+  ctx.fillStyle = '#2d2d44';
+  ctx.fillRect(0, 0, W, H);
+
+  // Floor pattern
+  ctx.strokeStyle = 'rgba(255,255,255,0.03)';
+  ctx.lineWidth = 1;
+  for (let x = 0; x < W; x += 40) {
+    ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,H); ctx.stroke();
+  }
+  for (let y = 0; y < H; y += 40) {
+    ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(W,y); ctx.stroke();
+  }
+
+  // Rooms (floor color)
+  rooms.forEach(r => {
+    ctx.fillStyle = r.color;
+    ctx.globalAlpha = 0.6;
+    ctx.fillRect(r.x+2, r.y+2, r.w-4, r.h-4);
+    ctx.globalAlpha = 1;
+
+    // Room label
+    ctx.fillStyle = 'rgba(255,255,255,0.08)';
+    ctx.font = '11px system-ui';
+    ctx.textAlign = 'center';
+    ctx.fillText(r.name, r.x+r.w/2, r.y+18);
+  });
+
+  // Walls
+  ctx.fillStyle = '#1a1a30';
+  walls.forEach(w => ctx.fillRect(w.x, w.y, w.w, w.h));
+  // Wall edges
+  ctx.strokeStyle = 'rgba(255,255,255,0.06)';
+  ctx.lineWidth = 1;
+  walls.forEach(w => { ctx.strokeRect(w.x, w.y, w.w, w.h); });
+
+  // Furniture
+  furniture.forEach(f => {
+    ctx.fillStyle = f.color;
+    ctx.fillRect(f.x, f.y, f.w, f.h);
+    ctx.strokeStyle = 'rgba(0,0,0,0.3)';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(f.x, f.y, f.w, f.h);
+    // furniture shadow
+    ctx.fillStyle = 'rgba(0,0,0,0.15)';
+    ctx.fillRect(f.x+3, f.y+3, f.w, f.h);
+  });
+
+  // Floor items
+  floorItems.forEach(item => {
+    if (item.collected) return;
+    const bobY = Math.sin(Date.now()/300 + item.idx) * 2;
+    ctx.save();
+    ctx.shadowColor = 'rgba(255,215,0,0.2)';
+    ctx.shadowBlur = 12;
+    ctx.font = '22px system-ui';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(item.type.emoji, item.x, item.y + bobY);
+    ctx.restore();
+
+    // Glow
+    ctx.fillStyle = 'rgba(255,215,0,0.06)';
+    ctx.beginPath();
+    ctx.arc(item.x, item.y + bobY, 16, 0, Math.PI*2);
+    ctx.fill();
+
+    // "E" prompt
+    const dx = player.x - item.x;
+    const dy = player.y - item.y;
+    if (Math.sqrt(dx*dx+dy*dy) < 35 && !game.heldItem) {
+      ctx.fillStyle = 'rgba(255,255,255,0.5)';
+      ctx.font = 'bold 10px system-ui';
+      ctx.textAlign = 'center';
+      ctx.fillText('[E]', item.x, item.y - 24);
+    }
+  });
+
+  // Traps
+  traps.forEach(trap => {
+    const idx = itemTypes.findIndex(it => it.id === trap.type.id);
+    ctx.save();
+    if (trap.triggered) {
+      ctx.globalAlpha = 0.3;
+    } else {
+      // Pulsing glow
+      const pulse = Math.sin(Date.now()/400) * 0.15 + 0.15;
+      ctx.shadowColor = '#ff6b35';
+      ctx.shadowBlur = 15 + Math.sin(Date.now()/300) * 8;
+    }
+    ctx.font = '18px system-ui';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(trap.type.emoji, trap.x, trap.y);
+    ctx.restore();
+
+    if (!trap.triggered) {
+      // Trap radius indicator (very subtle)
+      ctx.strokeStyle = 'rgba(255,107,53,0.1)';
+      ctx.lineWidth = 1;
+      ctx.setLineDash([3,6]);
+      ctx.beginPath();
+      ctx.arc(trap.x, trap.y, 20, 0, Math.PI*2);
+      ctx.stroke();
+      ctx.setLineDash([]);
+    }
+  });
+
+  // ─── PLAYER ───
+  ctx.save();
+  ctx.shadowColor = 'rgba(107,203,255,0.3)';
+  ctx.shadowBlur = 12;
+
+  // Body
+  ctx.fillStyle = '#4ecdc4';
+  ctx.beginPath();
+  ctx.arc(player.x, player.y, 12, 0, Math.PI*2);
+  ctx.fill();
+
+  // Inner
+  ctx.fillStyle = '#45b7aa';
+  ctx.beginPath();
+  ctx.arc(player.x, player.y, 8, 0, Math.PI*2);
+  ctx.fill();
+
+  // Eyes
+  const eyeOffX = player.vx !== 0 ? Math.sign(player.vx) * 3 : 3;
+  const eyeOffY = player.vy !== 0 ? Math.sign(player.vy) * 3 : -2;
+  ctx.fillStyle = '#fff';
+  ctx.beginPath();
+  ctx.arc(player.x - 3 + eyeOffX*0.3, player.y - 2, 3, 0, Math.PI*2);
+  ctx.arc(player.x + 3 + eyeOffX*0.3, player.y - 2, 3, 0, Math.PI*2);
+  ctx.fill();
+  ctx.fillStyle = '#1a1a2e';
+  ctx.beginPath();
+  ctx.arc(player.x - 3 + eyeOffX*0.5, player.y - 2, 1.5, 0, Math.PI*2);
+  ctx.arc(player.x + 3 + eyeOffX*0.5, player.y - 2, 1.5, 0, Math.PI*2);
+  ctx.fill();
+
+  // Held item indicator
+  if (game.heldItem) {
+    ctx.font = '14px system-ui';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'bottom';
+    ctx.fillText(game.heldItem.emoji, player.x, player.y - 18);
+  }
+
+  ctx.restore();
+
+  // ─── NEIGHBOUR ───
+  ctx.save();
+
+  // Suspicion indicator
+  if (neighbour.suspicion > 10) {
+    ctx.fillStyle = `rgba(255,50,50,${neighbour.suspicion/200})`;
+    ctx.beginPath();
+    ctx.arc(neighbour.x, neighbour.y, 20 + neighbour.suspicion/3, 0, Math.PI*2);
+    ctx.fill();
+  }
+
+  // Vision cone (suspicion)
+  if (neighbour.suspicion > 20) {
+    ctx.fillStyle = `rgba(255,200,50,${neighbour.suspicion/400})`;
+    ctx.beginPath();
+    ctx.moveTo(neighbour.x, neighbour.y);
+    const angle = neighbour.dir > 0 ? 0 : Math.PI;
+    const halfCone = 0.6;
+    const range = neighbour.visionRange * (neighbour.suspicion/100);
+    ctx.arc(neighbour.x, neighbour.y, range, angle-halfCone, angle+halfCone);
+    ctx.closePath();
+    ctx.fill();
+  }
+
+  // Body
+  ctx.shadowColor = 'rgba(255,50,50,0.3)';
+  ctx.shadowBlur = 10;
+  ctx.fillStyle = '#ff6b6b';
+  ctx.beginPath();
+  ctx.arc(neighbour.x, neighbour.y, 14, 0, Math.PI*2);
+  ctx.fill();
+
+  // Angry brows
+  ctx.fillStyle = '#4a1a1a';
+  ctx.fillRect(neighbour.x-8, neighbour.y-6, 5, 2);
+  ctx.fillRect(neighbour.x+3, neighbour.y-6, 5, 2);
+
+  // Eyes
+  ctx.fillStyle = '#fff';
+  ctx.beginPath();
+  ctx.arc(neighbour.x-4, neighbour.y-1, 3.5, 0, Math.PI*2);
+  ctx.arc(neighbour.x+4, neighbour.y-1, 3.5, 0, Math.PI*2);
+  ctx.fill();
+  ctx.fillStyle = '#4a1a1a';
+  const nEyeX = neighbour.dir > 0 ? 1.5 : -1.5;
+  ctx.beginPath();
+  ctx.arc(neighbour.x-4+nEyeX, neighbour.y-1, 1.8, 0, Math.PI*2);
+  ctx.arc(neighbour.x+4+nEyeX, neighbour.y-1, 1.8, 0, Math.PI*2);
+  ctx.fill();
+
+  // State indicator
+  let stateColor = '#6bcb6b';
+  let stateLabel = '😐';
+  if (neighbour.state === 'suspicious') { stateColor = '#ffd93d'; stateLabel = '🤨'; }
+  if (neighbour.state === 'chasing') { stateColor = '#ff6b6b'; stateLabel = '😡'; }
+  ctx.font = '12px system-ui';
+  ctx.textAlign = 'center';
+  ctx.fillText(stateLabel, neighbour.x, neighbour.y - 24);
+
+  ctx.restore();
+
+  // ─── PARTICLES ───
+  for (let i = game.particles.length-1; i >= 0; i--) {
+    const p = game.particles[i];
+    p.x += p.vx;
+    p.y += p.vy;
+    p.vy += 0.1;
+    p.life--;
+    ctx.globalAlpha = p.life / p.maxLife;
+    ctx.fillStyle = p.color;
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, p.size * (p.life/p.maxLife), 0, Math.PI*2);
+    ctx.fill();
+    ctx.globalAlpha = 1;
+    if (p.life <= 0) game.particles.splice(i, 1);
+  }
+
+  // ─── HUD Overlay ───
+  // Neighbour suspicion meter
+  if (neighbour.suspicion > 5) {
+    const barW = 60;
+    const barH = 4;
+    const bx = neighbour.x - barW/2;
+    const by = neighbour.y - 32;
+    ctx.fillStyle = 'rgba(0,0,0,0.4)';
+    ctx.roundRect(bx-1, by-1, barW+2, barH+2, 3);
+    ctx.fill();
+    ctx.fillStyle = '#333';
+    ctx.roundRect(bx, by, barW, barH, 2);
+    ctx.fill();
+    const fill = neighbour.suspicion/100;
+    const grad = ctx.createLinearGradient(bx,0,bx+barW,0);
+    grad.addColorStop(0,'#6bcb6b');
+    grad.addColorStop(0.5,'#ffd93d');
+    grad.addColorStop(1,'#ff6b6b');
+    ctx.fillStyle = grad;
+    ctx.roundRect(bx, by, barW*fill, barH, 2);
+    ctx.fill();
+  }
+
+  ctx.restore();
+}
+
+// Add roundRect polyfill for canvas
+if (!CanvasRenderingContext2D.prototype.roundRect) {
+  CanvasRenderingContext2D.prototype.roundRect = function(x, y, w, h, r) {
+    if (r > w/2) r = w/2;
+    if (r > h/2) r = h/2;
+    this.beginPath();
+    this.moveTo(x + r, y);
+    this.lineTo(x + w - r, y);
+    this.quadraticCurveTo(x + w, y, x + w, y + r);
+    this.lineTo(x + w, y + h - r);
+    this.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+    this.lineTo(x + r, y + h);
+    this.quadraticCurveTo(x, y + h, x, y + h - r);
+    this.lineTo(x, y + r);
+    this.quadraticCurveTo(x, y, x + r, y);
+    this.closePath();
+    return this;
+  };
+}
+
+// ─── GAME LOOP ───
+function update() {
+  if (!game.running) return;
+
+  // Timer
+  if (game.timeLeft > 0) {
+    game.timeLeft -= 1/60;
+    if (game.timeLeft <= 0) {
+      game.timeLeft = 0;
+      game.gameOver = true;
+      game.running = false;
+      finalScore.textContent = game.score;
+      gameOverMsg.innerHTML = `Time's up! You pulled off <strong>${game.score}</strong> / ${game.pranksTarget} pranks.`;
+      gameOverScreen.classList.add('show');
+    }
+    updateUI();
+  }
+
+  // Player movement
+  let mx = 0, my = 0;
+  if (keys['w'] || keys['arrowup']) my = -1;
+  if (keys['s'] || keys['arrowdown']) my = 1;
+  if (keys['a'] || keys['arrowleft']) mx = -1;
+  if (keys['d'] || keys['arrowright']) mx = 1;
+
+  if (mx !== 0 && my !== 0) {
+    mx *= 0.7071;
+    my *= 0.7071;
+  }
+
+  const speed = player.speed;
+  const nx = player.x + mx * speed;
+  const ny = player.y + my * speed;
+
+  if (canMoveTo(nx - player.w/2, player.y - player.h/2, player.w, player.h)) {
+    player.x = nx;
+    player.vx = mx;
+  }
+  if (canMoveTo(player.x - player.w/2, ny - player.h/2, player.w, player.h)) {
+    player.y = ny;
+    player.vy = my;
+  }
+
+  if (mx === 0) player.vx *= 0.85;
+  if (my === 0) player.vy *= 0.85;
+
+  updateNeighbour();
+
+  // Particles decay
+  for (let i = game.particles.length-1; i >= 0; i--) {
+    const p = game.particles[i];
+    p.x += p.vx;
+    p.y += p.vy;
+    if (p.vy !== undefined) p.vy += 0.05;
+    p.life--;
+    if (p.life <= 0) game.particles.splice(i, 1);
+  }
+}
+
+// ─── ANIMATION LOOP ───
+function loop() {
+  update();
+  draw();
+  requestAnimationFrame(loop);
+}
+
+// ─── START GAME ───
+function startGame() {
+  startScreen.classList.remove('show');
+  gameOverScreen.classList.remove('show');
+  winScreen.classList.remove('show');
+  resetGame();
+  game.running = true;
+  traps = [];
+  // Reset neighbour
+  neighbour.x = 600; neighbour.y = 50;
+  neighbour.state = 'patrol';
+  neighbour.suspicion = 0;
+  neighbour.patrolIdx = 0;
+  neighbour.targetX = neighbour.patrolPoints[0].x;
+  neighbour.targetY = neighbour.patrolPoints[0].y;
+}
+
+// ─── INIT ───
+resetGame();
+loop();
+
+// Expose startGame globally
+window.startGame = startGame;
+
+console.log('🏠 Neighbour from Hell loaded!');
+console.log('🎮 WASD to move | E to pick up | Q to place trap');
+console.log('🎯 Complete 7 pranks to win!');
+</script>
+</body>
+</html>
